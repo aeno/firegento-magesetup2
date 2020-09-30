@@ -6,7 +6,10 @@
 
 namespace FireGento\MageSetup\Block\Price;
 
+use Magento\Catalog\Api\Data\ProductInterface;
+use Magento\ConfigurableProduct\Model\Product\Type\Configurable;
 use Magento\Customer\Model\ResourceModel\GroupRepository;
+use Magento\GroupedProduct\Model\Product\Type\Grouped;
 
 /**
  * Block for showing price details like tax rate and delivery information.
@@ -134,8 +137,31 @@ class Details extends \Magento\Framework\View\Element\Template
     {
         $productTypeId = $this->saleableItem->getTypeId();
         $ignoreTypeIds = ['virtual', 'downloadable'];
+        $compositeTypeIds = [Configurable::TYPE_CODE, Grouped::TYPE_CODE];
+
         if (in_array($productTypeId, $ignoreTypeIds)) {
             return false;
+        }
+
+        if (in_array($productTypeId, $compositeTypeIds)) {
+            $children = [];
+
+            switch($productTypeId) {
+                case Configurable::TYPE_CODE:
+                    /** @var ProductInterface[] $children */
+                    $children = $this->saleableItem->getTypeInstance()->getUsedProducts($this->saleableItem);
+                    break;
+                case Grouped::TYPE_CODE:
+                    /** @var \Magento\Catalog\Model\ResourceModel\Product\Link\Product\Collection $children */
+                    $children = $this->saleableItem->getTypeInstance()->getAssociatedProducts($this->saleableItem);
+                    break;
+            }
+
+            foreach ($children as $child) {
+                if (in_array($child->getTypeId(), $ignoreTypeIds)) {
+                    return false;
+                }
+            }
         }
 
         return true;
